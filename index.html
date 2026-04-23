@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Text to PDF</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface-2: #1c1c1c;
+    --border: #262626;
+    --text: #ededed;
+    --text-dim: #8a8a8a;
+    --accent: #ffffff;
+    --success: #4ade80;
+    --error: #f87171;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", "Meiryo", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow: hidden;
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr auto;
+    gap: 16px;
+    height: 100vh;
+    padding: 20px;
+  }
+
+  header {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+  }
+
+  .brand {
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: var(--text);
+  }
+
+  .brand .dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .status {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .icon-btn:hover {
+    color: var(--text);
+    background: var(--surface);
+  }
+  .icon-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  #editor {
+    flex: 1;
+    width: 100%;
+    resize: none;
+    background: transparent;
+    color: var(--text);
+    border: none;
+    outline: none;
+    padding: 22px 24px;
+    font-size: 15px;
+    line-height: 1.75;
+    font-family: inherit;
+  }
+
+  #editor::placeholder {
+    color: var(--text-dim);
+  }
+
+  .preview-wrap {
+    flex: 1;
+    overflow: auto;
+    padding: 24px;
+    display: flex;
+    justify-content: center;
+    background: var(--surface-2);
+  }
+
+  .preview-wrap::-webkit-scrollbar {
+    width: 8px;
+  }
+  .preview-wrap::-webkit-scrollbar-thumb {
+    background: #2a2a2a;
+    border-radius: 4px;
+  }
+
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 20mm;
+    background: #ffffff;
+    color: #111111;
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", "Meiryo", sans-serif;
+    font-size: 11pt;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    transform-origin: top center;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    border-radius: 2px;
+  }
+
+  footer {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 8px;
+  }
+
+  .hint {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  button {
+    background: var(--accent);
+    color: #0a0a0a;
+    border: none;
+    padding: 11px 22px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: transform 0.08s ease, opacity 0.15s ease;
+  }
+
+  button:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+
+  button:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  button.secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  kbd {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 11px;
+    color: var(--text);
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    z-index: 100;
+    max-width: 80%;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
+  }
+  .toast.success { border-color: var(--success); }
+  .toast.error { border-color: var(--error); }
+  .toast a {
+    color: var(--text);
+    text-decoration: underline;
+    margin-left: 8px;
+  }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    backdrop-filter: blur(4px);
+  }
+  .modal-backdrop.show {
+    display: flex;
+  }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    max-width: 520px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .modal h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .modal p {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    margin-bottom: 16px;
+  }
+  .modal ol {
+    margin-left: 18px;
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.8;
+    margin-bottom: 16px;
+  }
+  .modal ol a {
+    color: var(--text);
+  }
+  .modal label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    letter-spacing: 0.04em;
+  }
+  .modal input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    margin-bottom: 16px;
+  }
+  .modal input:focus {
+    border-color: var(--text);
+  }
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  code {
+    background: var(--bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 12px;
+    color: var(--text);
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand"><span class="dot"></span>Text to PDF</div>
+      <div class="header-right">
+        <div class="status" id="status">0 文字</div>
+        <button class="icon-btn" id="settingsBtn" title="設定">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <section class="panel">
+      <div class="panel-head">
+        <span>入力</span>
+        <span class="hint"><kbd>⌘</kbd> + <kbd>V</kbd> で貼り付け</span>
+      </div>
+      <textarea id="editor" placeholder="ここにテキストを貼り付けてください..." autofocus spellcheck="false"></textarea>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <span>プレビュー（A4）</span>
+        <span class="hint" id="pageInfo">1 ページ</span>
+      </div>
+      <div class="preview-wrap">
+        <div class="page" id="page"></div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="hint" id="footerHint">ボタンを押すとPDFを保存 / Driveへエクスポート</div>
+      <div class="actions">
+        <button class="secondary" id="clearBtn">クリア</button>
+        <button class="secondary" id="downloadBtn" disabled>ダウンロード</button>
+        <button id="exportBtn" disabled>エクスポート</button>
+      </div>
+    </footer>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+      <h2>Google Drive 設定</h2>
+      <p>Driveへのエクスポートには、あなたのGoogle CloudプロジェクトのOAuth Client IDが必要です。一度設定すればブラウザに保存されます。</p>
+      <ol>
+        <li><a href="https://console.cloud.google.com/" target="_blank" rel="noopener">Google Cloud Console</a> でプロジェクト作成</li>
+        <li>「APIとサービス」→「ライブラリ」で <strong>Google Drive API</strong> を有効化</li>
+        <li>「認証情報」→「認証情報を作成」→「OAuth クライアント ID」</li>
+        <li>アプリケーションの種類は <strong>ウェブアプリケーション</strong></li>
+        <li>承認済みJavaScript生成元に <code>http://localhost:8000</code> を追加</li>
+        <li>作成したClient IDを下に貼り付け</li>
+      </ol>
+      <label>OAuth Client ID</label>
+      <input type="text" id="clientIdInput" placeholder="xxxxxxxxxxxx.apps.googleusercontent.com" spellcheck="false">
+      <label>エクスポート先フォルダID</label>
+      <input type="text" id="folderIdInput" value="1E8lPt7AYOoIfXMRSsxIg1bnopjZ3BZvi" spellcheck="false">
+      <div class="modal-actions">
+        <button class="secondary" id="modalCancelBtn">キャンセル</button>
+        <button id="modalSaveBtn">保存</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const editor = document.getElementById('editor');
+  const page = document.getElementById('page');
+  const status = document.getElementById('status');
+  const pageInfo = document.getElementById('pageInfo');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const exportBtn = document.getElementById('exportBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const settingsBtn = document.getElementById('settingsBtn');
+  const modal = document.getElementById('modal');
+  const clientIdInput = document.getElementById('clientIdInput');
+  const folderIdInput = document.getElementById('folderIdInput');
+  const modalCancelBtn = document.getElementById('modalCancelBtn');
+  const modalSaveBtn = document.getElementById('modalSaveBtn');
+  const toast = document.getElementById('toast');
+
+  const DEFAULT_CLIENT_ID = '972394218608-3uintj28q7kcrtaaa064t5pvb8pr8t91.apps.googleusercontent.com';
+  const DEFAULT_FOLDER_ID = '1E8lPt7AYOoIfXMRSsxIg1bnopjZ3BZvi';
+  const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+  let tokenClient = null;
+  let accessToken = null;
+
+  // ---------- UI helpers ----------
+  function showToast(message, type = '', linkUrl = null, linkText = null) {
+    toast.className = 'toast';
+    toast.innerHTML = '';
+    toast.appendChild(document.createTextNode(message));
+    if (linkUrl) {
+      const a = document.createElement('a');
+      a.href = linkUrl;
+      a.textContent = linkText || linkUrl;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      toast.appendChild(a);
+    }
+    if (type) toast.classList.add(type);
+    toast.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => toast.classList.remove('show'), linkUrl ? 8000 : 3000);
+  }
+
+  function updatePreview() {
+    const text = editor.value;
+    page.textContent = text || '';
+    status.textContent = `${text.length.toLocaleString()} 文字`;
+    const hasText = text.length > 0;
+    downloadBtn.disabled = !hasText;
+    exportBtn.disabled = !hasText;
+
+    requestAnimationFrame(() => {
+      const pageHeightPx = page.offsetWidth * (297 / 210);
+      const pages = Math.max(1, Math.ceil(page.scrollHeight / pageHeightPx));
+      pageInfo.textContent = `${pages} ページ`;
+    });
+  }
+
+  function buildFilename() {
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    return `document-${ts}.pdf`;
+  }
+
+  function buildPdfOptions(filename) {
+    return {
+      margin: 0,
+      filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'] }
+    };
+  }
+
+  function buildPrintableClone() {
+    const clone = page.cloneNode(true);
+    clone.style.boxShadow = 'none';
+    clone.style.borderRadius = '0';
+    return clone;
+  }
+
+  // ---------- Local download ----------
+  async function downloadPDF() {
+    if (!editor.value.trim()) return;
+    const original = downloadBtn.textContent;
+    downloadBtn.textContent = '生成中...';
+    downloadBtn.disabled = true;
+    try {
+      await html2pdf().set(buildPdfOptions(buildFilename())).from(buildPrintableClone()).save();
+    } catch (err) {
+      showToast('PDF生成に失敗しました: ' + err.message, 'error');
+    } finally {
+      downloadBtn.textContent = original;
+      downloadBtn.disabled = editor.value.length === 0;
+    }
+  }
+
+  // ---------- Google Drive export ----------
+  function getConfig() {
+    return {
+      clientId: localStorage.getItem('gdrive_client_id') || DEFAULT_CLIENT_ID,
+      folderId: localStorage.getItem('gdrive_folder_id') || DEFAULT_FOLDER_ID
+    };
+  }
+
+  function openModal() {
+    const { clientId, folderId } = getConfig();
+    clientIdInput.value = clientId;
+    folderIdInput.value = folderId;
+    modal.classList.add('show');
+    setTimeout(() => clientIdInput.focus(), 50);
+  }
+
+  function closeModal() {
+    modal.classList.remove('show');
+  }
+
+  function saveConfig() {
+    const cid = clientIdInput.value.trim();
+    const fid = folderIdInput.value.trim() || DEFAULT_FOLDER_ID;
+    if (cid) localStorage.setItem('gdrive_client_id', cid);
+    localStorage.setItem('gdrive_folder_id', fid);
+    // reset token client so the new client_id takes effect
+    tokenClient = null;
+    accessToken = null;
+    closeModal();
+    showToast('設定を保存しました', 'success');
+  }
+
+  function ensureTokenClient() {
+    const { clientId } = getConfig();
+    if (!clientId) {
+      throw new Error('Client IDが未設定です。右上の歯車から設定してください。');
+    }
+    if (typeof google === 'undefined' || !google.accounts) {
+      throw new Error('Google認証ライブラリが読み込めていません。ネットワークを確認してください。');
+    }
+    if (tokenClient) return tokenClient;
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: SCOPES,
+      callback: () => {}  // overridden per request
+    });
+    return tokenClient;
+  }
+
+  function requestAccessToken() {
+    return new Promise((resolve, reject) => {
+      const client = ensureTokenClient();
+      client.callback = (response) => {
+        if (response.error) {
+          reject(new Error(response.error_description || response.error));
+          return;
+        }
+        accessToken = response.access_token;
+        resolve(accessToken);
+      };
+      try {
+        client.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  async function generatePdfBlob() {
+    const filename = buildFilename();
+    const worker = html2pdf().set(buildPdfOptions(filename)).from(buildPrintableClone());
+    const blob = await worker.outputPdf('blob');
+    return { blob, filename };
+  }
+
+  async function uploadToDrive(blob, filename, folderId, token) {
+    const metadata = {
+      name: filename,
+      mimeType: 'application/pdf',
+      parents: [folderId]
+    };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', blob);
+
+    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink,name', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token },
+      body: form
+    });
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`アップロード失敗 (${res.status}): ${errorText}`);
+    }
+    return res.json();
+  }
+
+  async function copyToClipboard(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function exportToDrive() {
+    if (!editor.value.trim()) return;
+    const original = exportBtn.textContent;
+    exportBtn.textContent = '認証中...';
+    exportBtn.disabled = true;
+    try {
+      const { folderId } = getConfig();
+      const token = await requestAccessToken();
+      exportBtn.textContent = 'PDF生成中...';
+      const { blob, filename } = await generatePdfBlob();
+      exportBtn.textContent = 'アップロード中...';
+      const file = await uploadToDrive(blob, filename, folderId, token);
+      const link = file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`;
+      const copied = await copyToClipboard(link);
+      showToast(
+        copied ? 'エクスポート完了・リンクをコピーしました' : 'エクスポート完了（リンクコピー失敗）',
+        'success',
+        link,
+        '開く'
+      );
+    } catch (err) {
+      showToast('エクスポート失敗: ' + err.message, 'error');
+    } finally {
+      exportBtn.textContent = original;
+      exportBtn.disabled = editor.value.length === 0;
+    }
+  }
+
+  // ---------- Events ----------
+  editor.addEventListener('input', updatePreview);
+  downloadBtn.addEventListener('click', downloadPDF);
+  exportBtn.addEventListener('click', exportToDrive);
+  clearBtn.addEventListener('click', () => {
+    editor.value = '';
+    editor.focus();
+    updatePreview();
+  });
+  settingsBtn.addEventListener('click', openModal);
+  modalCancelBtn.addEventListener('click', closeModal);
+  modalSaveBtn.addEventListener('click', saveConfig);
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.classList.contains('show')) closeModal();
+  });
+
+  updatePreview();
+</script>
+</body>
+</html>
