@@ -265,7 +265,22 @@
   .toast a {
     color: var(--text);
     text-decoration: underline;
-    margin-left: 8px;
+    margin-left: 12px;
+  }
+  .toast .toast-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 5px 12px;
+    font-size: 12px;
+    border-radius: 6px;
+    margin-left: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+  }
+  .toast .toast-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
   }
 
   /* Modal */
@@ -487,7 +502,7 @@
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['css', 'legacy'] }
+      pagebreak: { mode: 'css' }
     };
   }
 
@@ -495,6 +510,8 @@
     const clone = page.cloneNode(true);
     clone.style.boxShadow = 'none';
     clone.style.borderRadius = '0';
+    clone.style.minHeight = '0';
+    clone.style.height = 'auto';
     return clone;
   }
 
@@ -612,12 +629,71 @@
   }
 
   async function copyToClipboard(text) {
+    try { window.focus(); } catch (e) {}
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (e) {}
+    }
     try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    } catch (e) {
       return false;
     }
+  }
+
+  function showExportResult(link) {
+    toast.className = 'toast success show';
+    toast.innerHTML = '';
+
+    const textSpan = document.createElement('span');
+    textSpan.textContent = 'エクスポート完了';
+    toast.appendChild(textSpan);
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'toast-btn';
+    copyBtn.textContent = 'リンクをコピー';
+    copyBtn.onclick = async () => {
+      const ok = await copyToClipboard(link);
+      if (ok) {
+        textSpan.textContent = 'リンクをコピーしました';
+        copyBtn.style.display = 'none';
+        clearTimeout(showExportResult._t);
+        showExportResult._t = setTimeout(() => toast.classList.remove('show'), 2500);
+      }
+    };
+    toast.appendChild(copyBtn);
+
+    const openLink = document.createElement('a');
+    openLink.href = link;
+    openLink.target = '_blank';
+    openLink.rel = 'noopener';
+    openLink.textContent = '開く';
+    toast.appendChild(openLink);
+
+    // best-effort auto-copy (may fail due to focus/activation loss after popup)
+    copyToClipboard(link).then(ok => {
+      if (ok) {
+        textSpan.textContent = 'エクスポート完了・リンクをコピーしました';
+        copyBtn.style.display = 'none';
+        clearTimeout(showExportResult._t);
+        showExportResult._t = setTimeout(() => toast.classList.remove('show'), 4000);
+      }
+    });
+
+    clearTimeout(showExportResult._t);
+    showExportResult._t = setTimeout(() => toast.classList.remove('show'), 12000);
   }
 
   async function exportToDrive() {
@@ -633,13 +709,7 @@
       exportBtn.textContent = 'アップロード中...';
       const file = await uploadToDrive(blob, filename, folderId, token);
       const link = file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`;
-      const copied = await copyToClipboard(link);
-      showToast(
-        copied ? 'エクスポート完了・リンクをコピーしました' : 'エクスポート完了（リンクコピー失敗）',
-        'success',
-        link,
-        '開く'
-      );
+      showExportResult(link);
     } catch (err) {
       showToast('エクスポート失敗: ' + err.message, 'error');
     } finally {
